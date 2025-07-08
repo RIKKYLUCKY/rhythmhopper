@@ -176,7 +176,7 @@ restartButton.addEventListener('click', () => {
     document.location.reload();
 });
 
-const GAME_URL = "https://あなたのゲームページのURL"; // ★★★ 将来、必ず書き換えてください ★★★
+const GAME_URL = "https://www.rikkiblog.net/entry/rhythm_hopper"; // ★★★ 将来、必ず書き換えてください ★★★
 const GAME_TITLE = "リズム・ホッパー";
 const HASH_TAGS = "リズムホッパー,ブラウザゲーム";
 
