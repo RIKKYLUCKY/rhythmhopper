@@ -21,7 +21,7 @@ let score = 0;
 let highScore = localStorage.getItem('rhythmHopperHighScore') || 0;
 let gameOver = false;
 let gameStarted = false;
-let loopCount = 0; // ★追加：音楽のループ回数をカウント
+let loopCount = 0;
 
 // === プレイヤー情報 ===
 const player = {
@@ -50,49 +50,88 @@ for (let i = 1; i <= totalBeats; i++) {
 let beatmapIndex = 0;
 
 // === 関数定義 ===
-function jump() { /* ...変更なし... */ }
-function drawGround() { /* ...変更なし... */ }
-function drawPlayer() { /* ...変更なし... */ }
-function drawObstacles() { /* ...変更なし... */ }
-function handleGameOver() { /* ...変更なし... */ }
+function jump() {
+    if (!player.isJumping && !gameOver) {
+        player.velocityY = JUMP_STRENGTH;
+        player.isJumping = true;
+    }
+}
 
+function drawGround() {
+    ctx.strokeStyle = 'white';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(0, GROUND_Y);
+    ctx.lineTo(canvas.width, GROUND_Y);
+    ctx.stroke();
+}
+
+function drawPlayer() {
+    ctx.fillStyle = '#3498db';
+    ctx.fillRect(player.x, player.y, player.width, player.height);
+}
+
+function drawObstacles() {
+    obstacles.forEach(obstacle => {
+        ctx.fillStyle = '#e74c3c';
+        ctx.fillRect(obstacle.x, obstacle.y, obstacle.width, obstacle.height);
+    });
+}
+
+function handleGameOver() {
+    gameOver = true;
+    if (bgm) bgm.pause();
+
+    if (score > highScore) {
+        highScore = score;
+        localStorage.setItem('rhythmHopperHighScore', highScore);
+    }
+
+    finalScoreElement.textContent = score;
+    finalHiscoreElement.textContent = highScore;
+    resultScreen.style.display = 'flex';
+}
 
 function mainLoop() {
-    if (!gameStarted || gameOver) return;
+    if (gameOver) return; // ゲームオーバーなら以降の処理をしない
+
     score++;
     
-    // ... (プレイヤーの物理演算は変更なし) ...
+    player.velocityY += GRAVITY;
+    player.y += player.velocityY;
+    if (player.y + player.height > GROUND_Y) {
+        player.y = GROUND_Y - player.height;
+        player.velocityY = 0;
+        player.isJumping = false;
+    }
 
-    // ▼▼▼【ここからが今回のメイン！】▼▼▼
-    // 譜面に合わせて障害物を生成
     if (bgm && beatmapIndex < beatmap.length && bgm.currentTime >= beatmap[beatmapIndex]) {
-        let obstacleHeight = 80; // 通常の障害物の高さ
+        let obstacleHeight = 80;
         let obstacleY = GROUND_Y - obstacleHeight;
-
-        // ★追加：曲の中盤(45秒以降)から高い障害物を出現させる
         if (bgm.currentTime > 45) {
-            // ループ回数に応じて高い障害物の出現確率を上げる
-            // 0周目: 20% / 1周目: 30% / 2周目: 40% ...
             const highObstacleChance = 0.2 + (loopCount * 0.1);
             if (Math.random() < highObstacleChance) {
-                obstacleHeight = 120; // 高い障害物の高さ
+                obstacleHeight = 120;
                 obstacleY = GROUND_Y - obstacleHeight;
             }
         }
-
         obstacles.push({
-            x: canvas.width,
-            y: obstacleY,
-            width: 30,
-            height: obstacleHeight
+            x: canvas.width, y: obstacleY,
+            width: 30, height: obstacleHeight
         });
         beatmapIndex++;
     }
-    // ▲▲▲【ここまで】▲▲▲
 
-    // ... (障害物の移動、削除、当たり判定は変更なし) ...
+    obstacles.forEach(obstacle => { obstacle.x -= OBSTACLE_SPEED; });
+    for (let i = obstacles.length - 1; i >= 0; i--) { if (obstacles[i].x + obstacles[i].width < 0) { obstacles.splice(i, 1); } }
 
-    // --- 描画処理 ---
+    obstacles.forEach(obstacle => {
+        if (player.x < obstacle.x + obstacle.width && player.x + player.width > obstacle.x &&
+            player.y < obstacle.y + obstacle.height && player.y + player.height > obstacle.y) {
+            handleGameOver();
+        }
+    });
+
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     drawGround();
     drawPlayer();
@@ -102,29 +141,79 @@ function mainLoop() {
     ctx.textAlign = 'left';
     ctx.fillText(`SCORE: ${score}`, 10, 30);
     ctx.fillText(`HI-SCORE: ${highScore}`, 10, 60);
-    ctx.fillText(`LOOP: ${loopCount + 1}`, canvas.width - 100, 30); // ★追加：ループ回数を表示
+    ctx.fillText(`LOOP: ${loopCount + 1}`, canvas.width - 100, 30);
+    
+    // requestAnimationFrameで次のフレームを予約
+    requestAnimationFrame(mainLoop);
 }
 
-function drawReadyScreen() { /* ...変更なし... */ }
+function drawReadyScreen() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    drawGround();
+    drawPlayer();
+    ctx.font = '30px sans-serif';
+    ctx.fillStyle = 'white';
+    ctx.textAlign = 'center';
+    ctx.fillText('Tap to Start', canvas.width / 2, canvas.height / 2);
+}
 
-function startGame() {
-    if (gameStarted) return;
+// ▼▼▼【ここからが今回のメイン！】▼▼▼
+// ゲームを開始する、より確実な関数
+function initGame() {
+    // 一度だけ実行されるように、リスナーを解除
+    canvas.removeEventListener('click', initGame);
+    document.removeEventListener('keydown', initGameOnSpace);
+    canvas.removeEventListener('touchstart', initGame);
+
     gameStarted = true;
-    if (bgm) {
-        bgm.loop = true; // ★追加：音楽をループ再生する設定
-        bgm.play().catch(e => console.error("音声の再生に失敗:", e));
 
-        // ★追加：音楽が1周したらループ回数をカウントアップし、譜面をリセットする
-        bgm.addEventListener('timeupdate', () => {
-            // 再生時間がほぼ0になったら（=1周したら）
-            if (bgm.currentTime < 0.1 && beatmapIndex > 0) {
-                loopCount++;
-                beatmapIndex = 0; // 譜面を最初からやり直す
-            }
+    // 音楽を再生
+    if (bgm) {
+        bgm.loop = true;
+        // play()はPromiseを返すので、成功してからループを開始するのが確実
+        bgm.play().then(() => {
+            console.log("音楽の再生に成功！");
+            // 音楽が1周した時の処理
+            bgm.addEventListener('timeupdate', () => {
+                if (bgm.currentTime < 0.1 && beatmapIndex > 0) {
+                    loopCount++;
+                    beatmapIndex = 0;
+                }
+            });
+            // メインループを開始
+            requestAnimationFrame(mainLoop);
+        }).catch(e => {
+            console.error("音声の再生に失敗:", e);
+            // 音声がなくてもゲームは開始する
+            requestAnimationFrame(mainLoop);
         });
+    } else {
+        // BGMがない場合もゲームを開始
+        requestAnimationFrame(mainLoop);
     }
-    setInterval(mainLoop, 1000 / 60);
+
+    // ゲーム中の操作イベントリスナーをここから有効にする
+    canvas.addEventListener('click', () => { if (!gameOver) jump(); });
+    canvas.addEventListener('touchstart', (e) => { e.preventDefault(); if (!gameOver) jump(); });
+    document.addEventListener('keydown', (e) => { if (e.code === 'Space' && !gameOver) jump(); });
 }
 
-// === イベントリスナー ===
-// ... (変更なし) ...
+function initGameOnSpace(e) {
+    if (e.code === 'Space') {
+        initGame();
+    }
+}
+// ▲▲▲【ここまで】▲▲▲
+
+// === UIボタンのイベントリスナー ===
+restartButton.addEventListener('click', () => { document.location.reload(); });
+// ...シェアボタンのリスナーは変更なし...
+
+
+// === ゲーム開始の準備 ===
+// 最初に待機画面を描画
+drawReadyScreen();
+// ユーザーの最初の操作でinitGameを呼び出す
+canvas.addEventListener('click', initGame);
+document.addEventListener('keydown', initGameOnSpace);
+canvas.addEventListener('touchstart', initGame);
