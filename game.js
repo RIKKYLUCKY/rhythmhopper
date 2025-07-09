@@ -2,9 +2,12 @@
 const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
 const bgm = document.getElementById('bgm');
-const friendShareButton = document.getElementById('friend-share-button');
-const resultScreen = document.getElementById('result-screen');
-// ... (他のUI要素取得は省略) ...
+
+// === ゲームの定数 ===
+const GRAVITY = 0.5;
+const JUMP_STRENGTH = -12;
+const GROUND_Y = canvas.height - 50;
+const OBSTACLE_SPEED = 5;
 
 // === ゲームの状態管理 ===
 let score = 0;
@@ -12,10 +15,17 @@ let highScore = localStorage.getItem('rhythmHopperHighScore') || 0;
 let gameOver = false;
 let gameStarted = false;
 let loopCount = 0;
-let gameStartTime = 0; // ▼▼▼ 追加：ゲーム内タイマーの基準時間
+let gameStartTime = 0;
 
 // === プレイヤー情報 ===
-const player = { /* ...変更なし... */ };
+const player = {
+    x: 100,
+    y: GROUND_Y - 50,
+    width: 50,
+    height: 50,
+    velocityY: 0,
+    isJumping: false
+};
 
 // === 譜面と障害物 ===
 const obstacles = [];
@@ -34,70 +44,150 @@ for (let i = 1; i <= totalBeats; i++) {
 let beatmapIndex = 0;
 
 // === 関数定義 ===
-function jump() { /* ...変更なし... */ }
-function drawGround() { /* ...変更なし... */ }
-function drawPlayer() { /* ...変更なし... */ }
-function drawObstacles() { /* ...変更なし... */ }
-function handleGameOver() { /* ...変更なし... */ }
+function jump() {
+    if (!player.isJumping && !gameOver) {
+        player.velocityY = JUMP_STRENGTH;
+        player.isJumping = true;
+    }
+}
 
-function mainLoop() {
+function update() {
+    if (!gameStarted) return;
     if (gameOver) return;
 
-    // ▼▼▼【ここからが今回のメイン！】▼▼▼
-    // ゲーム内タイマーで経過時間を計算 (秒単位)
     const elapsedTime = (performance.now() - gameStartTime) / 1000;
+    score++;
 
-    // 譜面に合わせて障害物を生成 (音楽の再生時間ではなく、ゲーム内タイマーを参照)
+    // プレイヤーの物理演算
+    player.velocityY += GRAVITY;
+    player.y += player.velocityY;
+    if (player.y + player.height > GROUND_Y) {
+        player.y = GROUND_Y - player.height;
+        player.velocityY = 0;
+        player.isJumping = false;
+    }
+
+    // 譜面に合わせて障害物を生成
     if (beatmapIndex < beatmap.length && elapsedTime >= beatmap[beatmapIndex]) {
         let obstacleHeight = 80;
-        let obstacleY = GROUND_Y - obstacleHeight;
-        // 曲の中盤以降で高い障害物を出現させるロジック (経過時間で判定)
         if (elapsedTime > 45) {
             const highObstacleChance = 0.2 + (loopCount * 0.1);
             if (Math.random() < highObstacleChance) {
                 obstacleHeight = 120;
-                obstacleY = GROUND_Y - obstacleHeight;
             }
         }
         obstacles.push({
-            x: canvas.width, y: obstacleY,
+            x: canvas.width, y: GROUND_Y - obstacleHeight,
             width: 30, height: obstacleHeight
         });
         beatmapIndex++;
     }
-    // ▲▲▲【ここまで】▲▲▲
 
-    score++;
+    // 障害物の移動と当たり判定
+    obstacles.forEach(obstacle => {
+        obstacle.x -= OBSTACLE_SPEED;
+        if (player.x < obstacle.x + obstacle.width && player.x + player.width > obstacle.x &&
+            player.y < obstacle.y + obstacle.height && player.y + player.height > obstacle.y) {
+            gameOver = true;
+            if (bgm) bgm.pause();
+            if (score > highScore) {
+                highScore = score;
+                localStorage.setItem('rhythmHopperHighScore', highScore);
+            }
+        }
+    });
 
-    // ... (プレイヤーの物理演算は変更なし) ...
-    // ... (障害物の移動、削除、当たり判定は変更なし) ...
-    
-    // --- 描画処理 ---
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-    drawGround();
-    drawPlayer();
-    drawObstacles();
-    // ... (スコア、ハイスコア、ループ回数の描画は変更なし) ...
-
-    requestAnimationFrame(mainLoop);
+    // 画面外の障害物を削除
+    for (let i = obstacles.length - 1; i >= 0; i--) {
+        if (obstacles[i].x + obstacles[i].width < 0) {
+            obstacles.splice(i, 1);
+        }
+    }
 }
 
-function drawReadyScreen() { /* ...変更なし... */ }
+function draw() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    // 地面を描画
+    ctx.strokeStyle = 'white';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(0, GROUND_Y);
+    ctx.lineTo(canvas.width, GROUND_Y);
+    ctx.stroke();
+
+    // プレイヤーと障害物を描画
+    ctx.fillStyle = '#3498db';
+    ctx.fillRect(player.x, player.y, player.width, player.height);
+    obstacles.forEach(obstacle => {
+        ctx.fillStyle = '#e74c3c';
+        ctx.fillRect(obstacle.x, obstacle.y, obstacle.width, obstacle.height);
+    });
+
+    // テキストを描画
+    ctx.font = '20px sans-serif';
+    ctx.fillStyle = 'white';
+    ctx.textAlign = 'left';
+    ctx.fillText(`SCORE: ${score}`, 10, 30);
+    ctx.fillText(`HI-SCORE: ${highScore}`, 10, 60);
+    ctx.fillText(`LOOP: ${loopCount + 1}`, canvas.width - 100, 30);
+
+    if (gameOver) {
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.font = '40px sans-serif';
+        ctx.fillStyle = 'white';
+        ctx.textAlign = 'center';
+        ctx.fillText('GAME OVER', canvas.width / 2, canvas.height / 2 - 40);
+        ctx.font = '20px sans-serif';
+        ctx.fillText(`SCORE: ${score}`, canvas.width / 2, canvas.height / 2);
+        ctx.fillText('Tap to Restart', canvas.width / 2, canvas.height / 2 + 40);
+    } else if (!gameStarted) {
+        ctx.font = '30px sans-serif';
+        ctx.fillStyle = 'white';
+        ctx.textAlign = 'center';
+        ctx.fillText('Tap to Start', canvas.width / 2, canvas.height / 2);
+    }
+
+    requestAnimationFrame(draw);
+}
 
 function startGame() {
     if (gameStarted) return;
     gameStarted = true;
-    
-    gameStartTime = performance.now(); // ▼▼▼ 追加：ゲーム開始時間を記録
-
+    gameStartTime = performance.now();
     if (bgm) {
-        bgm.loop = true;
         bgm.play().catch(e => console.error("音声の再生に失敗:", e));
+        bgm.addEventListener('timeupdate', () => {
+            if (bgm.currentTime < 0.1 && beatmapIndex > 0) {
+                loopCount++;
+                beatmapIndex = 0;
+            }
+        });
     }
-    
-    // メインループを開始
-    requestAnimationFrame(mainLoop);
+    // メインの計算ループを開始
+    setInterval(update, 1000 / 60);
 }
 
-// === イベントリスナーなど、以降のコードは変更ありません ===
-// ... (変更なし) ...
+// === イベントリスナー ===
+function handleInteraction(e) {
+    e.preventDefault();
+    if (gameOver) {
+        document.location.reload();
+    } else if (!gameStarted) {
+        startGame();
+    } else {
+        jump();
+    }
+}
+
+canvas.addEventListener('click', handleInteraction);
+canvas.addEventListener('touchstart', handleInteraction);
+document.addEventListener('keydown', (e) => {
+    if (e.code === 'Space') {
+        handleInteraction(e);
+    }
+});
+
+// === 描画を開始 ===
+draw();
