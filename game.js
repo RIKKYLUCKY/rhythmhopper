@@ -2,39 +2,32 @@
 const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
 const bgm = document.getElementById('bgm');
+const friendShareButton = document.getElementById('friend-share-button');
+const resultScreen = document.getElementById('result-screen');
+const finalScoreElement = document.getElementById('final-score');
+const finalHiscoreElement = document.getElementById('final-hiscore');
+const twitterShareButton = document.getElementById('twitter-share');
+const lineShareButton = document.getElementById('line-share');
+const restartButton = document.getElementById('restart-button');
 
-// === ゲームの定数 ===
+// === ゲームの定数・変数 (変更なし) ===
 const GRAVITY = 0.5;
 const JUMP_STRENGTH = -12;
 const GROUND_Y = canvas.height - 50;
 const OBSTACLE_SPEED = 5;
-
-// === ゲームの状態管理 ===
 let score = 0;
 let highScore = localStorage.getItem('rhythmHopperHighScore') || 0;
 let gameOver = false;
 let gameStarted = false;
 let loopCount = 0;
 let gameStartTime = 0;
-
-// === プレイヤー情報 ===
-const player = {
-    x: 100,
-    y: GROUND_Y - 50,
-    width: 50,
-    height: 50,
-    velocityY: 0,
-    isJumping: false
-};
-
-// === 譜面と障害物 ===
+const player = { x: 100, y: GROUND_Y - 50, width: 50, height: 50, velocityY: 0, isJumping: false };
 const obstacles = [];
 const beatmap = [];
 const BPM = 140;
 const beatInterval = 60 / BPM;
 const musicLengthInSeconds = 180;
 const totalBeats = Math.floor(musicLengthInSeconds / beatInterval);
-
 for (let i = 1; i <= totalBeats; i++) {
     if (i % 2 === 0) {
         const timing = 2 + (i * beatInterval);
@@ -51,13 +44,24 @@ function jump() {
     }
 }
 
+function handleGameOver() {
+    if(gameOver) return; // 複数回呼ばれるのを防ぐ
+    gameOver = true;
+    if (bgm) bgm.pause();
+    if (score > highScore) {
+        highScore = score;
+        localStorage.setItem('rhythmHopperHighScore', highScore);
+    }
+    // HTMLのUIに結果を反映
+    finalScoreElement.textContent = score;
+    finalHiscoreElement.textContent = highScore;
+    resultScreen.style.display = 'flex'; // リザルト画面を表示
+}
+
 function updateGameLogic() {
     if (!gameStarted || gameOver) return;
-
     const elapsedTime = (performance.now() - gameStartTime) / 1000;
     score++;
-
-    // プレイヤーの物理演算
     player.velocityY += GRAVITY;
     player.y += player.velocityY;
     if (player.y + player.height > GROUND_Y) {
@@ -65,52 +69,27 @@ function updateGameLogic() {
         player.velocityY = 0;
         player.isJumping = false;
     }
-
-    // 譜面に合わせて障害物を生成
     if (beatmapIndex < beatmap.length && elapsedTime >= beatmap[beatmapIndex]) {
         let obstacleHeight = 80;
         if (elapsedTime > 45) {
-            const highObstacleChance = 0.2 + (loopCount * 0.1);
-            if (Math.random() < highObstacleChance) {
-                obstacleHeight = 120;
-            }
+            if (Math.random() < (0.2 + loopCount * 0.1)) obstacleHeight = 120;
         }
-        obstacles.push({
-            x: canvas.width, y: GROUND_Y - obstacleHeight,
-            width: 30, height: obstacleHeight
-        });
+        obstacles.push({ x: canvas.width, y: GROUND_Y - obstacleHeight, width: 30, height: obstacleHeight });
         beatmapIndex++;
     }
-
-    // 障害物の移動
     obstacles.forEach(obstacle => {
         obstacle.x -= OBSTACLE_SPEED;
-    });
-
-    // 当たり判定
-    obstacles.forEach(obstacle => {
-        if (player.x < obstacle.x + obstacle.width && player.x + player.width > obstacle.x &&
-            player.y < obstacle.y + obstacle.height && player.y + player.height > obstacle.y) {
-            gameOver = true;
-            if (bgm) bgm.pause();
-            if (score > highScore) {
-                highScore = score;
-                localStorage.setItem('rhythmHopperHighScore', highScore);
-            }
+        if (player.x < obstacle.x + obstacle.width && player.x + player.width > obstacle.x && player.y < obstacle.y + obstacle.height && player.y + player.height > obstacle.y) {
+            handleGameOver();
         }
     });
-
-    // 画面外の障害物を削除
     for (let i = obstacles.length - 1; i >= 0; i--) {
-        if (obstacles[i].x + obstacles[i].width < 0) {
-            obstacles.splice(i, 1);
-        }
+        if (obstacles[i].x + obstacles[i].width < 0) obstacles.splice(i, 1);
     }
 }
 
 function draw() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
-
     // 地面
     ctx.strokeStyle = 'white';
     ctx.lineWidth = 2;
@@ -118,7 +97,6 @@ function draw() {
     ctx.moveTo(0, GROUND_Y);
     ctx.lineTo(canvas.width, GROUND_Y);
     ctx.stroke();
-
     // プレイヤーと障害物
     ctx.fillStyle = '#3498db';
     ctx.fillRect(player.x, player.y, player.width, player.height);
@@ -126,32 +104,19 @@ function draw() {
         ctx.fillStyle = '#e74c3c';
         ctx.fillRect(obstacle.x, obstacle.y, obstacle.width, obstacle.height);
     });
-
     // テキスト情報
     ctx.font = '20px sans-serif';
     ctx.fillStyle = 'white';
     ctx.textAlign = 'left';
     ctx.fillText(`SCORE: ${score}`, 10, 30);
     ctx.fillText(`HI-SCORE: ${highScore}`, 10, 60);
-    if(gameStarted) ctx.fillText(`LOOP: ${loopCount + 1}`, canvas.width - 100, 30);
-
-    // 画面中央のメッセージ
-    ctx.textAlign = 'center';
-    if (gameOver) {
-        ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
-        ctx.font = '40px sans-serif';
-        ctx.fillStyle = 'white';
-        ctx.fillText('GAME OVER', canvas.width / 2, canvas.height / 2 - 40);
-        ctx.font = '20px sans-serif';
-        ctx.fillText(`SCORE: ${score}`, canvas.width / 2, canvas.height / 2);
-        ctx.fillText('Tap to Restart', canvas.width / 2, canvas.height / 2 + 40);
-    } else if (!gameStarted) {
+    if(gameStarted && !gameOver) ctx.fillText(`LOOP: ${loopCount + 1}`, canvas.width - 100, 30);
+    // スタート前メッセージ
+    if (!gameStarted) {
+        ctx.textAlign = 'center';
         ctx.font = '30px sans-serif';
-        ctx.fillStyle = 'white';
         ctx.fillText('Tap or Click to Start', canvas.width / 2, canvas.height / 2);
     }
-
     requestAnimationFrame(draw);
 }
 
@@ -168,32 +133,45 @@ function startGame() {
             }
         });
     }
-    // メインの計算ループを開始
     setInterval(updateGameLogic, 1000 / 60);
 }
 
-// ▼▼▼【ここが今回のメイン！】イベントリスナーの修正 ▼▼▼
-function handleInteraction() {
-    if (gameOver) {
-        document.location.reload();
-    } else if (!gameStarted) {
-        startGame();
-    } else {
-        jump();
-    }
-}
+// === イベントリスナー ===
+const GAME_URL = "https://www.rikkiblog.net/entry/rhythm_hopper";
+const GAME_TITLE = "リズム・ホッパー";
+const HASH_TAGS = "リズムホッパー,ブラウザゲーム";
 
-// PCとスマホ両方で動作するようにイベントを設定
-canvas.addEventListener('mousedown', handleInteraction); // PCのクリック
-canvas.addEventListener('touchstart', (e) => { // スマホのタップ
-    e.preventDefault(); // 画面のスクロールを防ぐ
-    handleInteraction();
-});
-document.addEventListener('keydown', (e) => { // キーボードのスペースキー
+function handleInteraction(e) {
+    e.preventDefault();
+    if (!gameStarted) { startGame(); }
+    else { jump(); }
+}
+canvas.addEventListener('mousedown', handleInteraction);
+canvas.addEventListener('touchstart', handleInteraction);
+document.addEventListener('keydown', (e) => {
     if (e.code === 'Space') {
-        e.preventDefault(); // 画面のスクロールを防ぐ
+        e.preventDefault();
         handleInteraction();
     }
+});
+restartButton.addEventListener('click', () => { document.location.reload(); });
+twitterShareButton.addEventListener('click', (e) => {
+    e.preventDefault();
+    const text = `『${GAME_TITLE}』でスコア${score}点を獲得！`;
+    const shareUrl = `https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}&url=${encodeURIComponent(GAME_URL)}&hashtags=${encodeURIComponent(HASH_TAGS)}`;
+    window.open(shareUrl, '_blank');
+});
+lineShareButton.addEventListener('click', (e) => {
+    e.preventDefault();
+    const text = `『${GAME_TITLE}』でスコア${score}点を獲得！あなたも挑戦してみて！\n${GAME_URL}`;
+    const shareUrl = `https://line.me/R/msg/text/?${encodeURIComponent(text)}`;
+    window.open(shareUrl, '_blank');
+});
+friendShareButton.addEventListener('click', (e) => {
+    e.preventDefault();
+    const text = `このリズムゲーム、ハマる！一緒にハイスコアを競おう！ #${GAME_TITLE}`;
+    const shareUrl = `https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}&url=${encodeURIComponent(GAME_URL)}`;
+    window.open(shareUrl, '_blank');
 });
 
 // === 描画を開始 ===
