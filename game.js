@@ -72,7 +72,7 @@ function updateGameLogic() {
     if (beatmapIndex < beatmap.length && elapsedTime >= beatmap[beatmapIndex]) {
         let obstacleHeight = 80;
         if (elapsedTime > 45) {
-            if (Math.random() < (0.2 + loopCount * 0.1)) obstacleHeight = 120;
+            if (Math.random() < (0.2 + loopCount * 0.1)) obstacleHeight = 100;
         }
         obstacles.push({ x: canvas.width, y: GROUND_Y - obstacleHeight, width: 30, height: obstacleHeight });
         beatmapIndex++;
