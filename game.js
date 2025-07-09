@@ -51,9 +51,8 @@ function jump() {
     }
 }
 
-function update() {
-    if (!gameStarted) return;
-    if (gameOver) return;
+function updateGameLogic() {
+    if (!gameStarted || gameOver) return;
 
     const elapsedTime = (performance.now() - gameStartTime) / 1000;
     score++;
@@ -83,9 +82,13 @@ function update() {
         beatmapIndex++;
     }
 
-    // 障害物の移動と当たり判定
+    // 障害物の移動
     obstacles.forEach(obstacle => {
         obstacle.x -= OBSTACLE_SPEED;
+    });
+
+    // 当たり判定
+    obstacles.forEach(obstacle => {
         if (player.x < obstacle.x + obstacle.width && player.x + player.width > obstacle.x &&
             player.y < obstacle.y + obstacle.height && player.y + player.height > obstacle.y) {
             gameOver = true;
@@ -108,7 +111,7 @@ function update() {
 function draw() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-    // 地面を描画
+    // 地面
     ctx.strokeStyle = 'white';
     ctx.lineWidth = 2;
     ctx.beginPath();
@@ -116,7 +119,7 @@ function draw() {
     ctx.lineTo(canvas.width, GROUND_Y);
     ctx.stroke();
 
-    // プレイヤーと障害物を描画
+    // プレイヤーと障害物
     ctx.fillStyle = '#3498db';
     ctx.fillRect(player.x, player.y, player.width, player.height);
     obstacles.forEach(obstacle => {
@@ -124,20 +127,21 @@ function draw() {
         ctx.fillRect(obstacle.x, obstacle.y, obstacle.width, obstacle.height);
     });
 
-    // テキストを描画
+    // テキスト情報
     ctx.font = '20px sans-serif';
     ctx.fillStyle = 'white';
     ctx.textAlign = 'left';
     ctx.fillText(`SCORE: ${score}`, 10, 30);
     ctx.fillText(`HI-SCORE: ${highScore}`, 10, 60);
-    ctx.fillText(`LOOP: ${loopCount + 1}`, canvas.width - 100, 30);
+    if(gameStarted) ctx.fillText(`LOOP: ${loopCount + 1}`, canvas.width - 100, 30);
 
+    // 画面中央のメッセージ
+    ctx.textAlign = 'center';
     if (gameOver) {
         ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
         ctx.fillRect(0, 0, canvas.width, canvas.height);
         ctx.font = '40px sans-serif';
         ctx.fillStyle = 'white';
-        ctx.textAlign = 'center';
         ctx.fillText('GAME OVER', canvas.width / 2, canvas.height / 2 - 40);
         ctx.font = '20px sans-serif';
         ctx.fillText(`SCORE: ${score}`, canvas.width / 2, canvas.height / 2);
@@ -145,8 +149,7 @@ function draw() {
     } else if (!gameStarted) {
         ctx.font = '30px sans-serif';
         ctx.fillStyle = 'white';
-        ctx.textAlign = 'center';
-        ctx.fillText('Tap to Start', canvas.width / 2, canvas.height / 2);
+        ctx.fillText('Tap or Click to Start', canvas.width / 2, canvas.height / 2);
     }
 
     requestAnimationFrame(draw);
@@ -166,12 +169,11 @@ function startGame() {
         });
     }
     // メインの計算ループを開始
-    setInterval(update, 1000 / 60);
+    setInterval(updateGameLogic, 1000 / 60);
 }
 
-// === イベントリスナー ===
-function handleInteraction(e) {
-    e.preventDefault();
+// ▼▼▼【ここが今回のメイン！】イベントリスナーの修正 ▼▼▼
+function handleInteraction() {
     if (gameOver) {
         document.location.reload();
     } else if (!gameStarted) {
@@ -181,11 +183,16 @@ function handleInteraction(e) {
     }
 }
 
-canvas.addEventListener('click', handleInteraction);
-canvas.addEventListener('touchstart', handleInteraction);
-document.addEventListener('keydown', (e) => {
+// PCとスマホ両方で動作するようにイベントを設定
+canvas.addEventListener('mousedown', handleInteraction); // PCのクリック
+canvas.addEventListener('touchstart', (e) => { // スマホのタップ
+    e.preventDefault(); // 画面のスクロールを防ぐ
+    handleInteraction();
+});
+document.addEventListener('keydown', (e) => { // キーボードのスペースキー
     if (e.code === 'Space') {
-        handleInteraction(e);
+        e.preventDefault(); // 画面のスクロールを防ぐ
+        handleInteraction();
     }
 });
 
