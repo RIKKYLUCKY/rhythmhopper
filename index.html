@@ -2,6 +2,7 @@
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>リズム・ホッパー</title>
     <style>
         body {
@@ -14,12 +15,20 @@
             font-family: sans-serif;
         }
         #game-container {
-            position: relative; /* 子要素を配置する基準にする */
+            position: relative;
+            /* ▼▼▼ CSSの変更箇所 ▼▼▼ */
+            width: 800px; /* ゲームの基準幅 */
+            height: 400px; /* ゲームの基準高さ */
+            max-width: 100%; /* 画面幅より大きくならないようにする */
         }
         canvas {
             background-color: #2c3e50;
             border: 2px solid white;
             display: block;
+            /* ▼▼▼ CSSの変更箇所 ▼▼▼ */
+            width: 100%; /* 親要素の幅に合わせる */
+            height: 100%; /* 親要素の高さに合わせる */
+            box-sizing: border-box; /* ボーダーを含めてサイズ計算 */
         }
         #friend-share-container {
             position: absolute;
@@ -35,26 +44,19 @@
             height: 100%;
             background-color: rgba(0, 0, 0, 0.8);
             color: white;
-            display: none; /* 最初は非表示 */
+            display: none;
             flex-direction: column;
             justify-content: center;
             align-items: center;
             text-align: center;
         }
-        #result-title {
-            font-size: 50px; margin: 0; color: #f1c40f;
-        }
-        .score-display {
-            font-size: 24px; margin: 15px 0;
-        }
-        .share-button-container {
-            margin-top: 20px;
-        }
+        /* ...以降のCSSは変更なし... */
+        #result-title { font-size: 50px; margin: 0; color: #f1c40f; }
+        .score-display { font-size: 24px; margin: 15px 0; }
+        .share-button-container { margin-top: 20px; }
         .share-button {
-            display: inline-block; padding: 10px 20px;
-            margin: 0 10px; border-radius: 5px;
-            text-decoration: none; color: white;
-            font-weight: bold; font-size: 16px;
+            display: inline-block; padding: 10px 20px; margin: 0 10px; border-radius: 5px;
+            text-decoration: none; color: white; font-weight: bold; font-size: 16px;
         }
         .twitter-button { background-color: #1DA1F2; }
         .line-button { background-color: #06C755; }
@@ -62,9 +64,7 @@
             margin-top: 30px; font-size: 18px; cursor: pointer;
             border: 1px solid white; padding: 8px 16px; border-radius: 5px;
         }
-        #restart-button:hover {
-            background-color: white; color: black;
-        }
+        #restart-button:hover { background-color: white; color: black; }
     </style>
 </head>
 <body>
